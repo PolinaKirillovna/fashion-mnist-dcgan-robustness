@@ -1,0 +1,5 @@
+scenario,domain_fid,precision,recall,class_js_divergence,dropped_classes,mean_confidence,low_confidence_fraction,diversity,gen_nn_median,test_nn_median,seconds_per_epoch,trigger_rate,epsilon
+baseline,39.46,0.4369,0.5684,0.0143,0,0.7414,0.2972,26.715,5.431,3.612,52.3,,
+imbalance,116.922,0.4903,0.3478,0.0791,1,0.7274,0.315,24.105,4.876,3.759,69.4,,
+poison_eps0.05,38.108,0.4312,0.5831,0.009,0,0.7418,0.3006,26.818,5.48,3.612,60.7,0.0,0.05
+poison_eps0.2,41.731,0.4258,0.5676,0.0083,0,0.7367,0.3057,26.537,5.41,3.615,45.5,0.0205,0.2

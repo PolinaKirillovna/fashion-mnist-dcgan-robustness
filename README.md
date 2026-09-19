@@ -26,7 +26,30 @@ Work is organised in stages (see `PLAN.md`):
 - **Interpretation** — latent-space traversals, discriminator feature space, activation
   maps, saliency/Grad-CAM/occlusion, weight histograms.
 
-Key metrics and figures will be summarised here as stages complete.
+### Key results
+
+DCGAN (generator 545k params, discriminator 80k), 18 epochs, 30k-image subsample
+(CPU budget); auxiliary classifier accuracy 0.90. Metrics on 10 000 generations vs test:
+
+| Scenario | domain-FID | precision | recall | class JS | dropped | trigger rate |
+|---|---:|---:|---:|---:|---:|---:|
+| baseline | 39.5 | 0.44 | 0.57 | 0.014 | 0 | — |
+| imbalance (drop 95% of 3 classes) | 116.9 | 0.49 | 0.35 | 0.079 | 1 | — |
+| poison ε=5% | 38.1 | 0.43 | 0.58 | 0.009 | 0 | 0.000 |
+| poison ε=20% | 41.7 | 0.43 | 0.57 | 0.008 | 0 | 0.021 |
+
+**Findings.** Class imbalance causes **mode dropping** — recall collapses (0.57 → 0.35)
+and per-class FID of dropped classes rises 1.5–2.5×, while precision (realism) holds,
+so overall "quality" hides the failure. Poisoning makes the generator **reproduce the
+trigger** as a feature of "real" data, ε-dependent (0% at 5%, 2.1% at 20%); the trigger
+forms a separate cluster in the discriminator's feature space. No memorisation is found.
+
+Selected figures:
+
+| | |
+|---|---|
+| ![Samples](reports/figures/part3_samples_baseline.png) | ![Class dist](reports/figures/part3_classdist_imbalance.png) |
+| ![Interpolations](reports/figures/part5_interp_baseline.png) | ![Trigger cluster](reports/figures/part5_dfeatures_poison_umap.png) |
 
 ## Repository structure
 
