@@ -1,0 +1,100 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gan-robustness"
+version = "0.1.0"
+description = "DCGAN on Fashion-MNIST: math, evaluation, data-corruption robustness and interpretation"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+keywords = ["dcgan", "gan", "fashion-mnist", "robustness", "interpretability", "pytorch"]
+
+# torch 2.2.2 is the last release with prebuilt macOS x86_64 (Intel) wheels and is
+# incompatible with numpy>=2, so the whole stack is pinned to numpy 1.26.
+dependencies = [
+    "numpy>=1.26,<2",
+    "pandas>=2.2,<3",
+    "matplotlib>=3.8,<3.10",
+    "seaborn>=0.13",
+    "scikit-learn>=1.4,<1.6",
+    "scipy>=1.11,<1.14",
+    "contourpy<1.4",
+    "umap-learn>=0.5.5,<0.5.7",
+    # numba/llvmlite versions that ship prebuilt x86_64 macOS wheels.
+    "numba>=0.61,<0.62",
+    "llvmlite>=0.44,<0.45",
+    "torch>=2.2,<2.3",
+    "torchvision>=0.17,<0.18",
+    "pyyaml>=6.0",
+    "tqdm>=4.66",
+    "imageio>=2.30",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pytest>=8.0",
+    "jupyter>=1.0",
+    "nbconvert>=7.0",
+    "types-PyYAML>=6.0",
+    "pandas-stubs>=2.2",
+    "python-docx>=1.1",
+]
+
+[project.scripts]
+gan-robustness = "gan_robustness.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "ANN", "D"]
+ignore = [
+    "ANN401", # allow typing.Any where torch returns dynamic objects
+    "D203",   # incompatible with D211
+    "D213",   # incompatible with D212
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107", "ANN"]
+"scripts/*" = ["D100", "D103", "E501"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+files = ["src"]
+
+# torch/torchvision and scientific libs ship incomplete or dynamic stubs; treat
+# their imports as untyped rather than weakening strictness for our own code.
+[[tool.mypy.overrides]]
+module = [
+    "torch.*",
+    "torchvision.*",
+    "sklearn.*",
+    "umap.*",
+    "seaborn.*",
+    "matplotlib.*",
+    "scipy.*",
+    "imageio.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

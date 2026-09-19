@@ -1,0 +1,42 @@
+# Assistant / working files (privacy: never commit these)
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+AGENTS.md
+PLAN.md
+
+# Data (downloaded Fashion-MNIST and generated artifacts stay out of git)
+data/raw/*
+!data/raw/README.md
+data/processed/*
+!data/processed/.gitkeep
+
+# Experiment artifacts (checkpoints, samples, large json); small summaries force-added
+artifacts/*
+!artifacts/.gitkeep
+
+# Reports build output
+reports/report.docx
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+.coverage
+
+# Environments
+.venv/
+venv/
+env/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/

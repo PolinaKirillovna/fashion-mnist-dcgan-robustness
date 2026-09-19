@@ -1,0 +1,38 @@
+# Fast smoke configuration: tiny subsample, 1 epoch, small metrics.
+seed: 42
+num_threads: 8
+
+data:
+  subsample_size: 2000
+
+model:
+  latent_dim: 100
+  g_base: 32
+  d_base: 32
+  classifier_base: 16
+
+gan:
+  epochs: 1
+  batch_size: 256
+  learning_rate: 0.0002
+  beta1: 0.5
+  n_fixed_samples: 16
+
+classifier:
+  epochs: 1
+  batch_size: 256
+
+evaluation:
+  num_generated: 1000
+  precision_recall_k: 3
+  umap_points: 500
+  memorization_sample: 100
+
+imbalance:
+  drop_classes: [5, 8, 9]
+  drop_fraction: 0.95
+
+poison:
+  poison_class: 0
+  epsilons: [0.2]
+  trigger_size: 4
