@@ -18,6 +18,8 @@ IMAGE_SIDE: int = 28
 NUM_CHANNELS: int = 1
 NUM_CLASSES: int = 10
 PIXEL_MAX_VALUE: int = 255
+# Spatial size of the generator's first feature map / discriminator's last conv.
+LATENT_HW: int = 7
 CLASS_NAMES: tuple[str, ...] = (
     "T-shirt/top",
     "Trouser",
