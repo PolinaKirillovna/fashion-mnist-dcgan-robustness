@@ -1,0 +1,23 @@
+{
+  "n_train": 60000,
+  "n_test": 10000,
+  "class_counts_train": [
+    6000,
+    6000,
+    6000,
+    6000,
+    6000,
+    6000,
+    6000,
+    6000,
+    6000,
+    6000
+  ],
+  "quality": {
+    "train_duplicates": 0,
+    "train_test_overlap": 0,
+    "label_conflicts": 0,
+    "out_of_range": 0,
+    "degenerate": 0
+  }
+}

@@ -17,6 +17,7 @@ import yaml
 IMAGE_SIDE: int = 28
 NUM_CHANNELS: int = 1
 NUM_CLASSES: int = 10
+PIXEL_MAX_VALUE: int = 255
 CLASS_NAMES: tuple[str, ...] = (
     "T-shirt/top",
     "Trouser",
