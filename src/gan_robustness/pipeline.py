@@ -30,6 +30,8 @@ from gan_robustness.data.statistics import (
     class_distribution_frame,
     per_image_brightness,
 )
+from gan_robustness.models.classifier import Classifier
+from gan_robustness.models.generator import Generator
 from gan_robustness.projection import umap_project
 from gan_robustness.reproducibility import configure_cpu, seed_everything
 from gan_robustness.visualization import data_viz as dviz
@@ -396,9 +398,219 @@ def _append_metric_row(config: Config, row: dict[str, object]) -> None:
     logger.info("Updated metrics_summary.csv (%d scenarios)", len(combined))
 
 
+def _poison_tag(config: Config) -> str:
+    """Return the tag of the strongest poison model (largest epsilon)."""
+    return _scenario_tag("poison", max(config.poison.epsilons))
+
+
 def run_interpretation(config: Config) -> None:
-    """Stage 5: run interpretation across the trained models."""
-    raise NotImplementedError("Implemented in stage 5 (interpretation).")
+    """Run Part 5 interpretation across the trained models.
+
+    Args:
+        config: Loaded experiment configuration.
+    """
+    seed_everything(config.seed)
+    configure_cpu(config.num_threads)
+    apply_style()
+    from gan_robustness.attacks.poisoning import stamp_trigger
+    from gan_robustness.evaluation.generate import generate_float
+    from gan_robustness.interpretation import activations as act
+    from gan_robustness.interpretation import dfeatures as dfe
+    from gan_robustness.interpretation import latent as lat
+    from gan_robustness.interpretation import sensitivity as sens
+    from gan_robustness.interpretation import weights as wgt
+    from gan_robustness.models.generator import sample_latent
+    from gan_robustness.training.checkpoint import load_classifier, load_gan
+    from gan_robustness.visualization import interp_viz as iviz
+
+    device = _resolve_device()
+    models = _models_dir(config)
+    figures, tables = config.paths.figures_dir, config.paths.tables_dir
+    latent_dim = config.model.latent_dim
+    n_umap = config.evaluation.umap_points
+    poison_tag = _poison_tag(config)
+
+    classifier = load_classifier(models / "classifier.pt", device)
+    g_base, d_base = load_gan(models / "baseline.pt", device)
+    g_imb, d_imb = load_gan(models / "imbalance.pt", device)
+    g_poison, d_poison = load_gan(models / f"{poison_tag}.pt", device)
+
+    test = load_split(config.paths.raw_dir, train=False)
+    test_float = to_float_pm1(test.images)
+
+    # 1. Latent space: interpolations (baseline vs imbalance) + z-sensitivity.
+    iviz.plot_interpolations(
+        lat.interpolation_rows(g_base, latent_dim, device, 5, 8, config.seed),
+        "Интерполяции в латентном пространстве (базовая модель)",
+        figures / "part5_interp_baseline.png",
+    )
+    iviz.plot_interpolations(
+        lat.interpolation_rows(g_imb, latent_dim, device, 5, 8, config.seed),
+        "Интерполяции в латентном пространстве (дисбаланс)",
+        figures / "part5_interp_imbalance.png",
+    )
+    iviz.plot_latent_sensitivity(
+        {
+            "базовая": lat.latent_sensitivity(g_base, latent_dim, device, 8, config.seed),
+            "дисбаланс": lat.latent_sensitivity(g_imb, latent_dim, device, 8, config.seed),
+        },
+        "Чувствительность генератора к компонентам z",
+        figures / "part5_latent_sensitivity.png",
+    )
+
+    # 2. Discriminator hidden representations (UMAP + silhouette).
+    real_sub = test_float[:n_umap]
+    base_gen = generate_float(g_base, n_umap, latent_dim, device, config.seed)
+    imb_gen = generate_float(g_imb, n_umap, latent_dim, device, config.seed + 1)
+    feats = dfe.discriminator_features(
+        d_base, np.concatenate([real_sub, base_gen, imb_gen]), device
+    )
+    coords = umap_project(feats, config.seed)
+    groups = (
+        ["real"] * len(real_sub) + ["база-ген"] * len(base_gen) + ["дисбаланс-ген"] * len(imb_gen)
+    )
+    iviz.plot_feature_umap(
+        coords,
+        groups,
+        ["real", "база-ген", "дисбаланс-ген"],
+        "Признаки дискриминатора (базовый D): real vs генерации",
+        figures / "part5_dfeatures_umap.png",
+    )
+    silhouette = dfe.silhouette_by_class(
+        dfe.discriminator_features(d_base, real_sub, device), test.labels[:n_umap]
+    )
+
+    # Poisoned-D feature space with a dedicated trigger group.
+    class0 = test.images[test.labels == config.poison.poison_class][:n_umap]
+    trigger_imgs = to_float_pm1(stamp_trigger(class0, config.poison.trigger_size))
+    poison_gen = generate_float(g_poison, n_umap, latent_dim, device, config.seed + 2)
+    feats_p = dfe.discriminator_features(
+        d_poison, np.concatenate([real_sub, trigger_imgs, poison_gen]), device
+    )
+    coords_p = umap_project(feats_p, config.seed)
+    groups_p = (
+        ["real"] * len(real_sub)
+        + ["триггер"] * len(trigger_imgs)
+        + ["отравл.-ген"] * len(poison_gen)
+    )
+    iviz.plot_feature_umap(
+        coords_p,
+        groups_p,
+        ["real", "триггер", "отравл.-ген"],
+        "Признаки дискриминатора (отравленный D): триггер образует кластер",
+        figures / "part5_dfeatures_poison_umap.png",
+    )
+
+    # 3. Generator activations + discriminator first-layer filters.
+    z0 = sample_latent(1, latent_dim, device, config.seed)[0]
+    iviz.plot_generator_activations(
+        act.generator_layer_activations(g_base, z0, device),
+        "Активации генератора по слоям (базовая модель)",
+        figures / "part5_generator_activations.png",
+    )
+    iviz.plot_filters(
+        act.discriminator_first_filters(d_base),
+        "Фильтры первого слоя дискриминатора (базовая модель)",
+        figures / "part5_discriminator_filters.png",
+    )
+
+    # 4. Discriminator sensitivity: saliency / Grad-CAM / occlusion.
+    real_example = test_float[0]
+    trigger_example = trigger_imgs[0]
+    for name, img, disc in (
+        ("real", real_example, d_base),
+        ("trigger", trigger_example, d_poison),
+    ):
+        iviz.plot_sensitivity_maps(
+            img,
+            {
+                "saliency": sens.saliency(disc, img, device),
+                "Grad-CAM": sens.grad_cam(disc, img, device),
+                "окклюзия 4x4": sens.occlusion(disc, img, device, config.poison.trigger_size),
+            },
+            f"Чувствительность D ({name})",
+            figures / f"part5_sensitivity_{name}.png",
+        )
+
+    # 5. Weight/bias histograms: baseline vs poisoned.
+    iviz.plot_weight_histograms(
+        {
+            "базовый D": wgt.weight_bias_arrays(d_base),
+            "отравленный D": wgt.weight_bias_arrays(d_poison),
+        },
+        "Гистограммы весов и смещений дискриминатора",
+        figures / "part5_weights_discriminator.png",
+    )
+    iviz.plot_weight_histograms(
+        {
+            "базовый G": wgt.weight_bias_arrays(g_base),
+            "отравленный G": wgt.weight_bias_arrays(g_poison),
+        },
+        "Гистограммы весов и смещений генератора",
+        figures / "part5_weights_generator.png",
+    )
+
+    # Key objects gallery: good / bad / imbalance-rare-class / poison-trigger.
+    _plot_key_objects(config, classifier, g_base, g_imb, g_poison, device, figures)
+
+    _write_table(
+        pd.DataFrame({"metric": ["silhouette_real_by_class"], "value": [round(silhouette, 4)]}),
+        tables,
+        "part5_silhouette.csv",
+    )
+    logger.info("Part 5 interpretation complete (silhouette=%.4f)", silhouette)
+
+
+def _plot_key_objects(
+    config: Config,
+    classifier: Classifier,
+    g_base: Generator,
+    g_imb: Generator,
+    g_poison: Generator,
+    device: torch.device,
+    figures: Path,
+) -> None:
+    """Plot the four required key objects (good/bad/rare-class/trigger)."""
+    from gan_robustness.attacks.poisoning import detect_trigger
+    from gan_robustness.config import CLASS_NAMES
+    from gan_robustness.evaluation.generate import classify, generate_float, to_uint8
+    from gan_robustness.visualization import gan_viz as gviz
+
+    latent_dim = config.model.latent_dim
+    base_gen = generate_float(g_base, 2000, latent_dim, device, config.seed)
+    preds, conf, _ = classify(classifier, base_gen, device)
+    base_u8 = to_uint8(base_gen)
+    good = int(np.argmax(conf))
+    bad = int(np.argmin(conf))
+
+    imb_gen = generate_float(g_imb, 2000, latent_dim, device, config.seed + 1)
+    imb_preds, _, _ = classify(classifier, imb_gen, device)
+    rare = config.imbalance.drop_classes[-1]
+    rare_hits = np.flatnonzero(imb_preds == rare)
+    rare_idx = int(rare_hits[0]) if rare_hits.size else int(np.argmax(imb_preds == rare))
+    imb_u8 = to_uint8(imb_gen)
+
+    poison_gen = generate_float(g_poison, 2000, latent_dim, device, config.seed + 2)
+    poison_u8 = to_uint8(poison_gen)
+    triggered = np.flatnonzero(
+        detect_trigger(poison_u8, config.poison.trigger_size, config.poison.detection_threshold)
+    )
+    trig_idx = int(triggered[0]) if triggered.size else 0
+
+    images = np.stack([base_u8[good], base_u8[bad], imb_u8[rare_idx], poison_u8[trig_idx]])
+    captions = [
+        f"удачная\n{CLASS_NAMES[preds[good]]} {conf[good]:.2f}",
+        f"неудачная\n{CLASS_NAMES[preds[bad]]} {conf[bad]:.2f}",
+        f"дисбаланс\nредкий класс {CLASS_NAMES[rare]}",
+        "отравление\nтриггер",
+    ]
+    gviz.plot_examples(
+        images,
+        captions,
+        "Ключевые объекты интерпретации",
+        figures / "part5_key_objects.png",
+        ncols=4,
+    )
 
 
 def run_all(config: Config) -> None:
