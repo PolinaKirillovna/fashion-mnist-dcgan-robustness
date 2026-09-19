@@ -9,12 +9,16 @@ paths:
   artifacts_dir: artifacts
 
 data:
-  subsample_size: null   # set to 30000 if the CPU epoch is too slow (see bench)
+  # Full 60k gives ~168 s/epoch on CPU; subsampling to 30k (class-proportional)
+  # brings one epoch to ~56 s, within the ~60-75 s budget (see PLAN / report).
+  subsample_size: 30000
 
 model:
   latent_dim: 100
-  g_base: 64
-  d_base: 64
+  # Widths tuned from the epoch-time benchmark: g_base/d_base=48 -> ~56 s/epoch
+  # (G ~545k params, D ~80k). 64/64 was ~168 s/epoch (over budget).
+  g_base: 48
+  d_base: 48
   classifier_base: 32
 
 gan:
