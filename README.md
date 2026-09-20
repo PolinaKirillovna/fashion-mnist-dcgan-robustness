@@ -12,6 +12,8 @@ poisoning), and interprets both networks.
 > Educational project for the ITMO course *AI Systems Validation* (laboratory
 > practicum). Report and notebook are in Russian; code and docs are in English.
 
+**Полный отчёт одним файлом (с рисунками и таблицами): [reports/report.md](reports/report.md).**
+
 ## What is done
 
 The work covers the following parts:
