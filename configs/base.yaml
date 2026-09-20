@@ -10,7 +10,7 @@ paths:
 
 data:
   # Full 60k gives ~168 s/epoch on CPU; subsampling to 30k (class-proportional)
-  # brings one epoch to ~56 s, within the ~60-75 s budget (see PLAN / report).
+  # brings one epoch to ~56 s, within the ~60-75 s budget (see report).
   subsample_size: 30000
 
 model:

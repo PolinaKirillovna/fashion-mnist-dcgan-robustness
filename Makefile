@@ -72,7 +72,9 @@ all:
 	$(PYTHON) -m $(PKG) all --config $(CONFIG)
 
 report:
-	pandoc reports/report.md \
+	pandoc reports/title.md reports/report.md \
+		--metadata lang=ru \
+		--lua-filter=reports/pagebreak.lua \
 		--reference-doc=reports/reference.docx \
 		--resource-path=reports \
 		-o reports/report.docx

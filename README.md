@@ -10,11 +10,11 @@ generator, stresses it with controlled data corruption (class imbalance and
 poisoning), and interprets both networks.
 
 > Educational project for the ITMO course *AI Systems Validation* (laboratory
-> practicum, 2024). Report and notebook are in Russian; code and docs are in English.
+> practicum). Report and notebook are in Russian; code and docs are in English.
 
 ## What is done
 
-Work is organised in stages (see `PLAN.md`):
+The work covers the following parts:
 
 - **Task & data** — Fashion-MNIST description, reduced quality check, input representation.
 - **Architecture math** — the minimax game, optimal discriminator, transposed-convolution
